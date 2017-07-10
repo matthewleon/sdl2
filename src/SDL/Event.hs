@@ -757,9 +757,15 @@ waitEventTimeout timeout = liftIO $ alloca $ \e -> do
 pumpEvents :: MonadIO m => m ()
 pumpEvents = Raw.pumpEvents
 
+-- | An 'EventWatchCallback' can process and respond to an event
+-- when it is added to the event queue.
 type EventWatchCallback = Event -> IO ()
 newtype EventWatch = EventWatch {runEventWatchRemoval :: IO ()}
 
+-- | Trigger an 'EventWatchCallback' when an event is added to the SDL
+-- event queue.
+--
+-- See @<https://wiki.libsdl.org/SDL_AddEventWatch>@ for C documentation.
 addEventWatch :: MonadIO m => EventWatchCallback -> m EventWatch
 addEventWatch callback = liftIO $ do
   rawFilter <- Raw.mkEventFilter wrappedCb
@@ -774,5 +780,8 @@ addEventWatch callback = liftIO $ do
       Raw.delEventWatch rawFilter nullPtr
       freeHaskellFunPtr rawFilter
 
+-- | Remove an 'EventWatch'.
+--
+-- See @<https://wiki.libsdl.org/SDL_DelEventWatch>@ for C documentation.
 delEventWatch :: MonadIO m => EventWatch -> m ()
 delEventWatch = liftIO . runEventWatchRemoval
