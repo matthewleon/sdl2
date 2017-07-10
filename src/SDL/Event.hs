@@ -17,6 +17,11 @@ module SDL.Event
   , pumpEvents
   , waitEvent
   , waitEventTimeout
+    -- * Watching events
+  , EventWatchCallback
+  , EventWatch
+  , addEventWatch
+  , delEventWatch
     -- * Event data
   , Event(..)
   , EventPayload(..)
@@ -751,3 +756,23 @@ waitEventTimeout timeout = liftIO $ alloca $ \e -> do
 -- See @<https://wiki.libsdl.org/SDL_PumpEvents SDL_PumpEvents>@ for C documentation.
 pumpEvents :: MonadIO m => m ()
 pumpEvents = Raw.pumpEvents
+
+type EventWatchCallback = Event -> IO ()
+newtype EventWatch = EventWatch {runEventWatchRemoval :: IO ()}
+
+addEventWatch :: MonadIO m => EventWatchCallback -> m EventWatch
+addEventWatch callback = liftIO $ do
+  rawFilter <- Raw.mkEventFilter wrappedCb
+  Raw.addEventWatch rawFilter nullPtr
+  return (EventWatch $ auxRemove rawFilter)
+  where
+    wrappedCb :: Ptr () -> Ptr Raw.Event -> IO CInt
+    wrappedCb _ evPtr = 0 <$ (callback =<< convertRaw =<< peek evPtr)
+
+    auxRemove :: Raw.EventFilter -> IO ()
+    auxRemove rawFilter = do
+      Raw.delEventWatch rawFilter nullPtr
+      freeHaskellFunPtr rawFilter
+
+delEventWatch :: MonadIO m => EventWatch -> m ()
+delEventWatch = liftIO . runEventWatchRemoval
