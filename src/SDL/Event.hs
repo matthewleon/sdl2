@@ -17,9 +17,11 @@ module SDL.Event
   , pumpEvents
   , waitEvent
   , waitEventTimeout
+  , registerEvent
     -- * Event data
   , Event(..)
   , EventPayload(..)
+  , UserEvent
     -- ** Window events
   , WindowShownEventData(..)
   , WindowHiddenEventData(..)
@@ -102,6 +104,14 @@ data Event = Event
   , eventPayload :: EventPayload
     -- ^ Data pertaining to this event.
   } deriving (Eq, Ord, Generic, Show, Typeable)
+
+data UserEventType a b = UserEventType
+  { push :: UserEvent a b
+         -> m (Either UserEventPushError (UserEventHandler a b))
+  }
+    
+
+data UserEvent a b = UserEvent Int32 a b
 
 -- | An enumeration of all possible SDL event types. This data type pairs up event types with
 -- their payload, where possible.
@@ -729,6 +739,16 @@ waitEvent = liftIO $ alloca $ \e -> do
   throwIfNeg_ "SDL.Events.waitEvent" "SDL_WaitEvent" $
     Raw.waitEvent e
   peek e >>= convertRaw
+
+-- | Register a user-defined event
+registerEvent :: MonadIO m => m (Maybe (UserEventType a b))
+registerEvent = do
+  eventTypeId <- Raw.registerEvents 1
+  case eventTypeId of
+    maxBound - 1 -> return Nothing
+    _            -> return $
+      let pushFn (UserEvent code data1 data2) = do
+      return $ UserEventType pushFn
 
 -- | Wait until the specified timeout for the next available amount.
 waitEventTimeout :: MonadIO m
