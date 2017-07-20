@@ -56,6 +56,24 @@ instance FromNumber ControllerButton Int32 where
     Raw.SDL_CONTROLLER_BUTTON_DPAD_RIGHT -> ControllerButtonDpadRight
     _ -> ControllerButtonInvalid
 
+instance ToNumber ControllerButton Int32 where
+  toNumber ControllerButtonA = Raw.SDL_CONTROLLER_BUTTON_A
+  toNumber ControllerButtonB = Raw.SDL_CONTROLLER_BUTTON_B
+  toNumber ControllerButtonX = Raw.SDL_CONTROLLER_BUTTON_X
+  toNumber ControllerButtonY = Raw.SDL_CONTROLLER_BUTTON_Y
+  toNumber ControllerButtonBack =  Raw.SDL_CONTROLLER_BUTTON_BACK
+  toNumber ControllerButtonGuide = Raw.SDL_CONTROLLER_BUTTON_GUIDE
+  toNumber ControllerButtonStart = Raw.SDL_CONTROLLER_BUTTON_START
+  toNumber ControllerButtonLeftStick = Raw.SDL_CONTROLLER_BUTTON_LEFTSTICK
+  toNumber ControllerButtonRightStick = Raw.SDL_CONTROLLER_BUTTON_RIGHTSTICK
+  toNumber ControllerButtonLeftShoulder = Raw.SDL_CONTROLLER_BUTTON_LEFTSHOULDER
+  toNumber ControllerButtonRightShoulder = Raw.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER
+  toNumber ControllerButtonDpadUp = Raw.SDL_CONTROLLER_BUTTON_DPAD_UP
+  toNumber ControllerButtonDpadDown = Raw.SDL_CONTROLLER_BUTTON_DPAD_DOWN
+  toNumber ControllerButtonDpadLeft = Raw.SDL_CONTROLLER_BUTTON_DPAD_LEFT
+  toNumber ControllerButtonDpadRight = Raw.SDL_CONTROLLER_BUTTON_DPAD_RIGHT
+  toNumber ControllerButtonInvalid = Raw.SDL_CONTROLLER_BUTTON_INVALID
+
 -- | Identifies the state of a controller button.
 data ControllerButtonState = ControllerButtonPressed | ControllerButtonReleased
   deriving (Data, Eq, Generic, Ord, Read, Show, Typeable)
@@ -65,6 +83,10 @@ instance FromNumber ControllerButtonState Word8 where
     Raw.SDL_PRESSED -> ControllerButtonPressed
     Raw.SDL_RELEASED -> ControllerButtonReleased
     _ -> ControllerButtonPressed
+
+instance ToNumber ControllerButtonState Word8 where
+  toNumber ControllerButtonPressed = Raw.SDL_PRESSED
+  toNumber ControllerButtonReleased = Raw.SDL_RELEASED
 
 -- | Identified whether the game controller was added, removed, or remapped.
 data ControllerDeviceConnection
@@ -78,3 +100,8 @@ instance FromNumber ControllerDeviceConnection Word32 where
     Raw.SDL_CONTROLLERDEVICEADDED -> ControllerDeviceAdded
     Raw.SDL_CONTROLLERDEVICEREMOVED -> ControllerDeviceRemoved
     _ -> ControllerDeviceRemapped
+
+instance ToNumber ControllerDeviceConnection Word32 where
+  toNumber ControllerDeviceAdded = Raw.SDL_CONTROLLERDEVICEADDED
+  toNumber ControllerDeviceRemoved = Raw.SDL_CONTROLLERDEVICEREMOVED
+  toNumber ControllerDeviceRemapped = Raw.SDL_CONTROLLERDEVICEREMAPPED

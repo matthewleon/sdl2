@@ -17,6 +17,9 @@ module SDL.Event
   , pumpEvents
   , waitEvent
   , waitEventTimeout
+    -- * Push event
+  , PushEventResult(..)
+  --, pushEvent
     -- * Watching events
   , EventWatchCallback
   , EventWatch
@@ -79,6 +82,7 @@ module SDL.Event
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Data (Data)
+import Data.Foldable (foldl')
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import Data.Typeable
@@ -704,6 +708,189 @@ convertRaw (Raw.ClipboardUpdateEvent _ ts) =
 convertRaw (Raw.UnknownEvent t ts) =
   return (Event ts (UnknownEvent (UnknownEventData t)))
 
+convertToRaw :: MonadIO m => Event -> m Raw.Event
+convertToRaw (Event ts payload) =
+  case payload of
+    WindowShownEvent (WindowShownEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_SHOWN 0 0
+    WindowHiddenEvent (WindowHiddenEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_EXPOSED 0 0
+    WindowExposedEvent (WindowExposedEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_EXPOSED 0 0
+    WindowMovedEvent (WindowMovedEventData win (P (V2 x y))) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_MOVED x y
+    WindowResizedEvent (WindowResizedEventData win (V2 w h)) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_RESIZED w h
+    WindowSizeChangedEvent (WindowSizeChangedEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_SIZE_CHANGED 0 0
+    WindowMinimizedEvent (WindowMinimizedEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_MINIMIZED 0 0
+    WindowMaximizedEvent (WindowMaximizedEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_MAXIMIZED 0 0
+    WindowRestoredEvent (WindowRestoredEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_RESTORED 0 0
+    WindowGainedMouseFocusEvent (WindowGainedMouseFocusEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_ENTER 0 0
+    WindowLostMouseFocusEvent (WindowLostMouseFocusEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_LEAVE 0 0
+    WindowGainedKeyboardFocusEvent (WindowGainedKeyboardFocusEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_FOCUS_GAINED 0 0
+    WindowLostKeyboardFocusEvent (WindowLostKeyboardFocusEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_FOCUS_LOST 0 0
+    WindowClosedEvent (WindowClosedEventData win) ->
+      rawWindowEvent win Raw.SDL_WINDOWEVENT_CLOSE 0 0
+
+    KeyboardEvent (KeyboardEventData win Pressed repeated keysym) ->
+      rawKeyboardEvent win Raw.SDL_KEYDOWN Raw.SDL_PRESSED repeated keysym
+    KeyboardEvent (KeyboardEventData win Released repeated keysym) ->
+      rawKeyboardEvent win Raw.SDL_KEYUP Raw.SDL_RELEASED repeated keysym
+
+    TextEditingEvent (TextEditingEventData win text start len) ->
+      withWindow win $ \windowId ->
+        Raw.TextEditingEvent Raw.SDL_TEXTEDITING ts windowId (textToCCharString text) start len
+
+    TextInputEvent (TextInputEventData win text) ->
+      withWindow win $ \windowId ->
+        let text' = textToCCharString text
+        in  Raw.TextInputEvent Raw.SDL_TEXTINPUT ts windowId text'
+
+    KeymapChangedEvent ->
+      return $ Raw.KeymapChangedEvent Raw.SDL_KEYMAPCHANGED ts
+
+    MouseMotionEvent
+      (MouseMotionEventData win which state (P (V2 x y)) (V2 xrel yrel)) ->
+        withWindow win $ \windowId ->
+          let which' = toNumber which
+              state' = foldl' setBit zeroBits $
+                         fromIntegral . toNumber <$> state
+          in  Raw.MouseMotionEvent Raw.SDL_MOUSEMOTION ts windowId which' state' x y xrel yrel
+
+    MouseButtonEvent
+      (MouseButtonEventData win Pressed which button clicks (P (V2 x y))) ->
+      withWindow win $ \windowId ->
+        let motion  = Raw.SDL_MOUSEBUTTONDOWN
+            which'  = toNumber which
+            button' = toNumber button
+            state   = Raw.SDL_PRESSED
+        in Raw.MouseButtonEvent motion ts windowId which' button' state clicks x y
+
+    MouseButtonEvent
+      (MouseButtonEventData win Released which button clicks (P (V2 x y))) ->
+      withWindow win $ \windowId ->
+        let motion  = Raw.SDL_MOUSEBUTTONUP
+            which'  = toNumber which
+            button' = toNumber button
+            state   = Raw.SDL_RELEASED
+        in Raw.MouseButtonEvent motion ts windowId which' button' state clicks x y
+
+    MouseWheelEvent (MouseWheelEventData win which (V2 x y) direction) ->
+      withWindow win $ \windowId ->
+        let direction' = case direction of
+              ScrollNormal  -> Raw.SDL_MOUSEWHEEL_NORMAL
+              ScrollFlipped -> Raw.SDL_MOUSEWHEEL_FLIPPED
+        in  Raw.MouseWheelEvent
+              Raw.SDL_MOUSEWHEEL ts windowId (toNumber which) x y direction'
+
+    JoyAxisEvent (JoyAxisEventData which axis value) ->
+      return $ Raw.JoyAxisEvent Raw.SDL_JOYAXISMOTION ts which axis value
+
+    JoyBallEvent (JoyBallEventData which ball (V2 xrel yrel)) ->
+      return $ Raw.JoyBallEvent Raw.SDL_JOYBALLMOTION ts which ball xrel yrel
+
+    JoyHatEvent (JoyHatEventData which hat value) ->
+      return $ Raw.JoyHatEvent Raw.SDL_JOYHATMOTION ts which hat (toNumber value)
+
+    JoyButtonEvent (JoyButtonEventData which button state) ->
+      let t = case state of
+            JoyButtonPressed -> Raw.SDL_JOYBUTTONDOWN
+            JoyButtonReleased -> Raw.SDL_JOYBUTTONUP
+      in return $ Raw.JoyButtonEvent t ts which button (toNumber state)
+
+    JoyDeviceEvent (JoyDeviceEventData connection which) ->
+      return $ Raw.JoyDeviceEvent (toNumber connection) ts which
+
+    ControllerAxisEvent (ControllerAxisEventData which axis value) ->
+      return $ Raw.ControllerAxisEvent Raw.SDL_CONTROLLERAXISMOTION ts which axis value
+
+    ControllerButtonEvent (ControllerButtonEventData which button state) ->
+      let t = case state of
+            ControllerButtonPressed -> Raw.SDL_CONTROLLERBUTTONDOWN
+            ControllerButtonReleased -> Raw.SDL_CONTROLLERBUTTONUP
+      in  return $ Raw.ControllerButtonEvent t ts which (fromIntegral $ toNumber button) (fromIntegral $ toNumber state)
+
+    ControllerDeviceEvent (ControllerDeviceEventData connection which) ->
+      return $ Raw.ControllerDeviceEvent (toNumber connection) ts which
+
+    AudioDeviceEvent (AudioDeviceEventData added which isCapture) ->
+      let t = if added then Raw.SDL_AUDIODEVICEADDED else Raw.SDL_AUDIODEVICEREMOVED
+          isCapture' = if isCapture then 1 else 0
+      in  return $ Raw.AudioDeviceEvent t ts which isCapture'
+
+    QuitEvent -> Raw.QuitEvent Raw.SDL_QUIT ts
+
+    UserEvent (UserEventData win code data1 data2) -> withWindow win $ \windowID ->
+      -- Don't do this. Use the registration and push mechanisms instead.
+      return $ Raw.UserEvent Raw.SDL_USER
+
+    where
+      withWindow  :: MonadIO m => Window -> (Word32 -> a) -> m a
+      withWindow w f = withWindow' w (return . f)
+
+      withWindow' :: MonadIO m => Window -> (Word32 -> m a) -> m a
+      withWindow' (Window win) f = Raw.getWindowID win >>= f
+
+      rawWindowEvent win ev d1 d2 = withWindow win $ \windowId ->
+        Raw.WindowEvent Raw.SDL_WINDOWEVENT ts windowId ev d1 d2
+
+      rawKeyboardEvent win ev state repeated
+                       (Keysym scancode keycode modifier) =
+        withWindow win $ \windowId ->
+          let repeated' = if repeated then 1 else 0
+              keysym'   = Raw.Keysym (toNumber scancode)
+                                     (toNumber keycode)
+                                     (fromIntegral $ toNumber modifier)
+          in  Raw.KeyboardEvent ev ts windowId state repeated' keysym'
+
+      textToCCharString :: Text -> [CChar]
+      textToCCharString  = (map castCharToCChar) . BSC8.unpack . Text.encodeUtf8
+{-
+convertRaw (Raw.UserEvent _ ts a b c d) =
+  do w' <- fmap Window (Raw.getWindowFromID a)
+     return (Event ts (UserEvent (UserEventData w' b c d)))
+convertRaw (Raw.SysWMEvent _ ts a) =
+  return (Event ts (SysWMEvent (SysWMEventData a)))
+convertRaw (Raw.TouchFingerEvent _ ts a b c d e f g) =
+  return (Event ts
+                (TouchFingerEvent
+                   (TouchFingerEventData a
+                                         b
+                                         (P (V2 c d))
+                                         (V2 e f)
+                                         g)))
+convertRaw (Raw.MultiGestureEvent _ ts a b c d e f) =
+  return (Event ts
+                (MultiGestureEvent
+                   (MultiGestureEventData a
+                                          b
+                                          c
+                                          (P (V2 d e))
+                                          f)))
+convertRaw (Raw.DollarGestureEvent _ ts a b c d e f) =
+  return (Event ts
+                (DollarGestureEvent
+                   (DollarGestureEventData a
+                                           b
+                                           c
+                                           d
+                                           (P (V2 e f)))))
+convertRaw (Raw.DropEvent _ ts a) =
+  return (Event ts (DropEvent (DropEventData a)))
+convertRaw (Raw.ClipboardUpdateEvent _ ts) =
+  return (Event ts ClipboardUpdateEvent)
+convertRaw (Raw.UnknownEvent t ts) =
+  return (Event ts (UnknownEvent (UnknownEventData t)))
+-}
+
 -- | Poll for currently pending events. You can only call this function in the thread that set the video mode.
 pollEvent :: MonadIO m => m (Maybe Event)
 pollEvent = liftIO $ alloca $ \e -> do
@@ -746,6 +933,17 @@ waitEventTimeout timeout = liftIO $ alloca $ \e -> do
   if n == 0
      then return Nothing
      else fmap Just (peek e >>= convertRaw)
+
+data PushEventResult = PushEventSuccess
+                     | PushEventFiltered
+                     | PushEventError Raw.SDLError
+                     -- Should it be Raw.SDLError or some wrapped version?
+
+-- | Push an event onto the queue.
+{-
+pushEvent :: monadIO m => Event -> m PushEventResult
+pushEvent ev =
+-}
 
 -- | Pump the event loop, gathering events from the input devices.
 --

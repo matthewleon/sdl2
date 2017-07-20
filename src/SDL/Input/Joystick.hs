@@ -69,6 +69,10 @@ instance FromNumber JoyButtonState Word8 where
     Raw.SDL_RELEASED -> JoyButtonReleased
     _ -> JoyButtonReleased
 
+instance ToNumber JoyButtonState Word8 where
+  toNumber JoyButtonPressed = Raw.SDL_PRESSED
+  toNumber JoyButtonReleased = Raw.SDL_RELEASED
+
 -- | Count the number of joysticks attached to the system.
 --
 -- See @<https://wiki.libsdl.org/SDL_NumJoysticks SDL_NumJoysticks>@ for C documentation.
@@ -193,6 +197,17 @@ instance FromNumber JoyHatPosition Word8 where
     Raw.SDL_HAT_LEFTDOWN -> HatLeftDown
     _ -> HatCentered
 
+instance ToNumber JoyHatPosition Word8 where
+  toNumber HatCentered = Raw.SDL_HAT_CENTERED
+  toNumber HatUp = Raw.SDL_HAT_UP
+  toNumber HatRight = Raw.SDL_HAT_RIGHT
+  toNumber HatDown = Raw.SDL_HAT_DOWN
+  toNumber HatLeft = Raw.SDL_HAT_LEFT
+  toNumber HatRightUp = Raw.SDL_HAT_RIGHTUP
+  toNumber HatRightDown = Raw.SDL_HAT_RIGHTDOWN
+  toNumber HatLeftUp = Raw.SDL_HAT_LEFTUP
+  toNumber HatLeftDown = Raw.SDL_HAT_LEFTDOWN
+
 -- | Get current position of a POV hat on a joystick.
 --
 -- See @<https://wiki.libsdl.org/SDL_JoystickGetHat SDL_JoystickGetHat>@ for C documentation.
@@ -217,3 +232,7 @@ instance FromNumber JoyDeviceConnection Word32 where
     Raw.SDL_JOYDEVICEADDED -> JoyDeviceAdded
     Raw.SDL_JOYDEVICEREMOVED -> JoyDeviceRemoved
     _ -> JoyDeviceAdded
+
+instance ToNumber JoyDeviceConnection Word32 where
+  toNumber JoyDeviceAdded = Raw.SDL_JOYDEVICEADDED
+  toNumber JoyDeviceRemoved = Raw.SDL_JOYDEVICEREMOVED

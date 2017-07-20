@@ -126,6 +126,10 @@ instance FromNumber MouseDevice Word32 where
     Raw.SDL_TOUCH_MOUSEID -> Touch
     n -> Mouse $ fromIntegral n
 
+instance ToNumber MouseDevice Word32 where
+  toNumber (Mouse i) = fromIntegral i
+  toNumber Touch = Raw.SDL_TOUCH_MOUSEID
+
 -- | Identifies mouse scroll direction.
 data MouseScrollDirection
   = ScrollNormal
