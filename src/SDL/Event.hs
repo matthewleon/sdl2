@@ -17,6 +17,10 @@ module SDL.Event
   , pumpEvents
   , waitEvent
   , waitEventTimeout
+    -- * Registering user events
+  , RegisteredEventType(..)
+  , EventPushResult(..)
+  , registerEvent
     -- * Watching events
   , EventWatchCallback
   , EventWatch
@@ -431,8 +435,10 @@ data AudioDeviceEventData =
 
 -- | Event data for application-defined events.
 data UserEventData =
-  UserEventData {userEventWindow :: !(Maybe Window)
-                 -- ^ The associated 'Window', if any.
+  UserEventData {userEventType :: !Word32
+                 -- ^ User defined event type.
+                ,userEventWindow :: !(Maybe Window)
+                 -- ^ The associated 'Window'.
                 ,userEventCode :: !Int32
                  -- ^ User defined event code.
                 ,userEventData1 :: !(Ptr ())
@@ -668,9 +674,9 @@ convertRaw (Raw.AudioDeviceEvent _ _ _ _) =
   error "convertRaw: Unknown audio device motion"
 convertRaw (Raw.QuitEvent _ ts) =
   return (Event ts QuitEvent)
-convertRaw (Raw.UserEvent _ ts a b c d) =
+convertRaw (Raw.UserEvent t ts a b c d) =
   do w <- getWindowFromID a
-     return (Event ts (UserEvent (UserEventData w b c d)))
+     return (Event ts (UserEvent (UserEventData t w b c d)))
 convertRaw (Raw.SysWMEvent _ ts a) =
   return (Event ts (SysWMEvent (SysWMEventData a)))
 convertRaw (Raw.TouchFingerEvent _ ts a b c d e f g) =
@@ -746,6 +752,57 @@ waitEventTimeout timeout = liftIO $ alloca $ \e -> do
   if n == 0
      then return Nothing
      else fmap Just (peek e >>= convertRaw)
+
+-- | A user defined event structure that has been registered with SDL.
+--
+-- Use 'registerEvent', below, to obtain an instance.
+data RegisteredEventType m a =
+  RegisteredEventType {pushRegisteredEvent :: a -> m EventPushResult
+                      ,getRegisteredEvent :: Event -> m (Maybe a)
+                      }
+
+-- | Possible results of an attempted push of an event to the queue.
+data EventPushResult = EventPushSuccess | EventPushFiltered | EventPushFailure Text
+  deriving (Data, Eq, Generic, Ord, Read, Show, Typeable)
+
+-- | Register a data structure as a new event type.
+--
+-- Provide functions that convert from 'Event' to your structure, and from your
+-- structure to 'UserEventData', with an arbitrary integer for userEventType
+-- (it, along with the event timestamp, will be filled in automatically).
+--
+-- You can then use 'pushRegisteredEvent' to add a custom event of the
+-- registered type to the queue, and 'getRegisteredEvent' to test for such
+-- events in the main loop.
+registerEvent :: MonadIO m
+              => (Event -> m (Maybe a))
+              -> (a -> m UserEventData)
+              -> m (Maybe (RegisteredEventType m a))
+registerEvent eventToUserEvent userEventToUserEventData = do
+  typ <- Raw.registerEvents 1
+  if typ == maxBound
+  then return Nothing
+  else
+    let pushEv uEv = do
+          UserEventData _ maybeWin code d1 d2 <- userEventToUserEventData uEv
+          windowID <- case maybeWin of
+            Just (Window w) -> Raw.getWindowID w
+            Nothing         -> return 0
+          -- timestamp will be filled in by SDL
+          let rawEvent = Raw.UserEvent typ 0 windowID code d1 d2
+          liftIO . alloca $ \eventPtr -> do
+            poke eventPtr rawEvent
+            pushResult <- Raw.pushEvent eventPtr
+            case pushResult of
+              1 -> return $ EventPushSuccess
+              0 -> return $ EventPushFiltered
+              _ -> EventPushFailure <$> getError
+
+        getEv ev@(Event _ (UserEvent (UserEventData typ _ _ _ _))) =
+          eventToUserEvent ev
+        getEv _ = return Nothing
+
+    in return . Just $ RegisteredEventType pushEv getEv
 
 -- | Pump the event loop, gathering events from the input devices.
 --

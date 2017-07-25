@@ -9,6 +9,7 @@ Unreleased
 * Several event payloads now have their `Window` fields modified to use `Maybe Window`, substituting `Nothing` for null pointers.
 * High-level structure for joystick device connection: `JoyDeviceConnection`.
 * High-level structure for joystick button state: `JoyButtonState`.
+* Support for user defined events: `registerEvent`, `pushRegisteredEvent`, and `getRegisteredEvent`.
 
 2.2.0
 =====
