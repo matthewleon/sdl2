@@ -374,7 +374,7 @@ data JoyButtonEventData =
                       -- ^ The instance id of the joystick that reported the event.
                      ,joyButtonEventButton :: !Word8
                       -- ^ The index of the button that changed.
-                     ,joyButtonEventState :: !Word8
+                     ,joyButtonEventState :: !JoyButtonState
                       -- ^ The state of the button.
                      }
   deriving (Eq,Ord,Generic,Show,Typeable)
@@ -647,7 +647,7 @@ convertRaw (Raw.JoyHatEvent _ ts a b c) =
                                     b
                                     (fromNumber c))))
 convertRaw (Raw.JoyButtonEvent _ ts a b c) =
-  return (Event ts (JoyButtonEvent (JoyButtonEventData a b c)))
+  return (Event ts (JoyButtonEvent (JoyButtonEventData a b (fromNumber c))))
 convertRaw (Raw.JoyDeviceEvent t ts a) =
   return (Event ts (JoyDeviceEvent (JoyDeviceEventData (fromNumber t) a)))
 convertRaw (Raw.ControllerAxisEvent _ ts a b c) =
