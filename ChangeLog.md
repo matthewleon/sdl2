@@ -7,6 +7,7 @@ Unreleased
 * High-level structure for controller buttons: `ControllerButton`.
 * High-level structure for controller connection: `ControllerDeviceConnection`.
 * Several event payloads now have their `Window` fields modified to use `Maybe Window`, substituting `Nothing` for null pointers.
+* High-level structure for joystick device connection: `JoyDeviceConnection`.
 
 2.2.0
 =====
