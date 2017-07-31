@@ -30,7 +30,7 @@ main = do
       putStrLn "press q at any time to quit"
       appLoop registeredTimerEvent
 
-mkTimerCb :: RegisteredEventType IO TimerEvent -> TimerCallback
+mkTimerCb :: RegisteredEventType TimerEvent -> TimerCallback
 mkTimerCb (RegisteredEventType pushTimerEvent _) interval = do
   pushResult <- pushTimerEvent =<< timerEvent
   case pushResult of
@@ -39,7 +39,7 @@ mkTimerCb (RegisteredEventType pushTimerEvent _) interval = do
     EventPushFailure e -> putStrLn $ "Couldn't push event: " ++ Text.unpack e
   return $ Reschedule interval
 
-appLoop :: RegisteredEventType IO TimerEvent -> IO ()
+appLoop :: RegisteredEventType TimerEvent -> IO ()
 appLoop (RegisteredEventType pushTimerEvent getTimerEvent) = waitEvent >>= go
   where
   go :: Event -> IO ()

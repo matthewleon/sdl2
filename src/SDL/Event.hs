@@ -760,9 +760,9 @@ waitEventTimeout timeout = liftIO $ alloca $ \e -> do
 -- | A user defined event structure that has been registered with SDL.
 --
 -- Use 'registerEvent', below, to obtain an instance.
-data RegisteredEventType m a =
-  RegisteredEventType {pushRegisteredEvent :: a -> m EventPushResult
-                      ,getRegisteredEvent :: Event -> m (Maybe a)
+data RegisteredEventType a =
+  RegisteredEventType {pushRegisteredEvent :: a -> IO EventPushResult
+                      ,getRegisteredEvent :: Event -> IO (Maybe a)
                       }
 
 -- | A record used to convert between SDL Events and user-defined data structures.
@@ -798,9 +798,9 @@ data EventPushResult = EventPushSuccess | EventPushFiltered | EventPushFailure T
 -- registered type to the queue, and 'getRegisteredEvent' to test for such
 -- events in the main loop.
 registerEvent :: MonadIO m
-              => (RegisteredEventData -> Timestamp -> m (Maybe a))
-              -> (a -> m RegisteredEventData)
-              -> m (Maybe (RegisteredEventType m a))
+              => (RegisteredEventData -> Timestamp -> IO (Maybe a))
+              -> (a -> IO RegisteredEventData)
+              -> m (Maybe (RegisteredEventType a))
 registerEvent registeredEventDataToEvent eventToRegisteredEventData = do
   typ <- Raw.registerEvents 1
   if typ == maxBound
