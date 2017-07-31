@@ -107,8 +107,6 @@ import qualified SDL.Raw as Raw
 import Control.Applicative
 #endif
 
-type Timestamp = Word32
-
 -- | A single SDL event. This event occured at 'eventTimestamp' and carries data under 'eventPayload'.
 data Event = Event
   { eventTimestamp :: Timestamp
@@ -116,6 +114,8 @@ data Event = Event
   , eventPayload :: EventPayload
     -- ^ Data pertaining to this event.
   } deriving (Eq, Ord, Generic, Show, Typeable)
+
+type Timestamp = Word32
 
 -- | An enumeration of all possible SDL event types. This data type pairs up event types with
 -- their payload, where possible.
@@ -765,6 +765,9 @@ data RegisteredEventType m a =
                       ,getRegisteredEvent :: Event -> m (Maybe a)
                       }
 
+-- | A record used to convert between SDL Events and user-defined data structures.
+--
+-- Used for 'registerEvent', below.
 data RegisteredEventData =
   RegisteredEventData {registeredEventWindow :: !(Maybe Window)
                        -- ^ The associated 'Window'.
@@ -777,6 +780,10 @@ data RegisteredEventData =
                       }
   deriving (Eq,Ord,Generic,Show,Typeable)
 
+-- | A registered event with no associated data.
+--
+-- This is a resonable baseline to modify for converting to
+-- 'RegisteredEventData'.
 emptyRegisteredEvent :: RegisteredEventData
 emptyRegisteredEvent = RegisteredEventData Nothing 0 nullPtr nullPtr
 
@@ -784,7 +791,7 @@ emptyRegisteredEvent = RegisteredEventData Nothing 0 nullPtr nullPtr
 data EventPushResult = EventPushSuccess | EventPushFiltered | EventPushFailure Text
   deriving (Data, Eq, Generic, Ord, Read, Show, Typeable)
 
--- | Register a data structure as a new event type.
+-- | Register a new event type with SDL.
 --
 -- Provide functions that convert between 'UserEventData' and your structure.
 -- You can then use 'pushRegisteredEvent' to add a custom event of the
