@@ -1,8 +1,9 @@
 module UserEvents where
 
+import Control.Concurrent (myThreadId)
 import Data.Maybe (Maybe(Nothing))
-import Foreign.Ptr (nullPtr)
 import qualified Data.Text as Text
+import Foreign.Ptr (nullPtr)
 import SDL
 
 data TimerEvent = TimerEvent
@@ -10,7 +11,8 @@ data TimerEvent = TimerEvent
 timerEvent :: IO TimerEvent
 timerEvent = do
   t <- show <$> ticks
-  putStrLn $ "Created timer event at " ++ t ++ " ticks."
+  tid <- show <$> myThreadId
+  putStrLn $ "Created timer event at " ++ t ++ " ticks. Threadid: " ++ tid
   return TimerEvent
 
 main :: IO ()
@@ -51,7 +53,8 @@ appLoop (RegisteredEventType pushTimerEvent getTimerEvent) = waitEvent >>= go
         case maybeTimerEvent of
           Just _ -> do
              t <- show <$> ticks
-             putStrLn $ "Got timer event from queue at " ++ t ++ " ticks."
+             tid <- show <$> myThreadId
+             putStrLn $ "Got timer event from queue at " ++ t ++ " ticks. Threadid: " ++ tid
           Nothing -> return ()
         waitEvent >>= go
       _ -> waitEvent >>= go
