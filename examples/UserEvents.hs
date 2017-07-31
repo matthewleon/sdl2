@@ -20,10 +20,9 @@ timerEvent = do
 main :: IO ()
 main = do
   initializeAll
-  let eventToUserEvent = \(Event ts _) -> return . Just $ TimerEvent ts
-      userEventToUserEventData =
-        const . return $ UserEventData 0 Nothing 0 nullPtr nullPtr
-  registeredEvent <- registerEvent eventToUserEvent userEventToUserEventData
+  let toTimerEvent _ = return . Just . TimerEvent
+      fromTimerEvent = const $ return emptyRegisteredEvent
+  registeredEvent <- registerEvent toTimerEvent fromTimerEvent
   case registeredEvent of
     Nothing -> putStrLn "Fatal error: unable to register timer events."
     Just registeredTimerEvent -> do

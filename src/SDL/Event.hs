@@ -19,7 +19,9 @@ module SDL.Event
   , waitEventTimeout
     -- * Registering user events
   , RegisteredEventType(..)
+  , RegisteredEventData(..)
   , EventPushResult(..)
+  , emptyRegisteredEvent
   , registerEvent
     -- * Watching events
   , EventWatchCallback
@@ -105,9 +107,11 @@ import qualified SDL.Raw as Raw
 import Control.Applicative
 #endif
 
+type Timestamp = Word32
+
 -- | A single SDL event. This event occured at 'eventTimestamp' and carries data under 'eventPayload'.
 data Event = Event
-  { eventTimestamp :: Word32
+  { eventTimestamp :: Timestamp
     -- ^ The time the event occured.
   , eventPayload :: EventPayload
     -- ^ Data pertaining to this event.
@@ -761,31 +765,43 @@ data RegisteredEventType m a =
                       ,getRegisteredEvent :: Event -> m (Maybe a)
                       }
 
+data RegisteredEventData =
+  RegisteredEventData {registeredEventWindow :: !(Maybe Window)
+                       -- ^ The associated 'Window'.
+                      ,registeredEventCode :: !Int32
+                       -- ^ User defined event code.
+                      ,registeredEventData1 :: !(Ptr ())
+                       -- ^ User defined data pointer.
+                      ,registeredEventData2 :: !(Ptr ())
+                       -- ^ User defined data pointer.
+                      }
+  deriving (Eq,Ord,Generic,Show,Typeable)
+
+emptyRegisteredEvent :: RegisteredEventData
+emptyRegisteredEvent = RegisteredEventData Nothing 0 nullPtr nullPtr
+
 -- | Possible results of an attempted push of an event to the queue.
 data EventPushResult = EventPushSuccess | EventPushFiltered | EventPushFailure Text
   deriving (Data, Eq, Generic, Ord, Read, Show, Typeable)
 
 -- | Register a data structure as a new event type.
 --
--- Provide functions that convert from 'Event' to your structure, and from your
--- structure to 'UserEventData', with an arbitrary integer for userEventType
--- (it, along with the event timestamp, will be filled in automatically).
---
+-- Provide functions that convert between 'UserEventData' and your structure.
 -- You can then use 'pushRegisteredEvent' to add a custom event of the
 -- registered type to the queue, and 'getRegisteredEvent' to test for such
 -- events in the main loop.
 registerEvent :: MonadIO m
-              => (Event -> m (Maybe a))
-              -> (a -> m UserEventData)
+              => (RegisteredEventData -> Timestamp -> m (Maybe a))
+              -> (a -> m RegisteredEventData)
               -> m (Maybe (RegisteredEventType m a))
-registerEvent eventToUserEvent userEventToUserEventData = do
+registerEvent registeredEventDataToEvent eventToRegisteredEventData = do
   typ <- Raw.registerEvents 1
   if typ == maxBound
   then return Nothing
   else
-    let pushEv uEv = do
-          UserEventData _ maybeWin code d1 d2 <- userEventToUserEventData uEv
-          windowID <- case maybeWin of
+    let pushEv ev = do
+          RegisteredEventData mWin code d1 d2 <- eventToRegisteredEventData ev
+          windowID <- case mWin of
             Just (Window w) -> Raw.getWindowID w
             Nothing         -> return 0
           -- timestamp will be filled in by SDL
@@ -798,8 +814,8 @@ registerEvent eventToUserEvent userEventToUserEventData = do
               0 -> return $ EventPushFiltered
               _ -> EventPushFailure <$> getError
 
-        getEv ev@(Event _ (UserEvent (UserEventData typ _ _ _ _))) =
-          eventToUserEvent ev
+        getEv (Event ts (UserEvent (UserEventData typ mWin code d1 d2))) =
+          registeredEventDataToEvent (RegisteredEventData mWin code d1 d2) ts
         getEv _ = return Nothing
 
     in return . Just $ RegisteredEventType pushEv getEv
