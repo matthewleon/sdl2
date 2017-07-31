@@ -2,24 +2,27 @@ module UserEvents where
 
 import Control.Concurrent (myThreadId)
 import Data.Maybe (Maybe(Nothing))
+import Data.Word (Word32)
 import qualified Data.Text as Text
 import Foreign.Ptr (nullPtr)
 import SDL
 
-data TimerEvent = TimerEvent
+-- | A timer event with timestamp
+data TimerEvent = TimerEvent Word32
 
 timerEvent :: IO TimerEvent
 timerEvent = do
   t <- show <$> ticks
   tid <- show <$> myThreadId
   putStrLn $ "Created timer event at " ++ t ++ " ticks. Threadid: " ++ tid
-  return TimerEvent
+  return $ TimerEvent 0
 
 main :: IO ()
 main = do
   initializeAll
-  let eventToUserEvent = const . return $ Just TimerEvent
-      userEventToUserEventData = const . return $ UserEventData 0 Nothing 0 nullPtr nullPtr
+  let eventToUserEvent = \(Event ts _) -> return . Just $ TimerEvent ts
+      userEventToUserEventData =
+        const . return $ UserEventData 0 Nothing 0 nullPtr nullPtr
   registeredEvent <- registerEvent eventToUserEvent userEventToUserEventData
   case registeredEvent of
     Nothing -> putStrLn "Fatal error: unable to register timer events."
@@ -51,10 +54,12 @@ appLoop (RegisteredEventType pushTimerEvent getTimerEvent) = waitEvent >>= go
       UserEvent _ -> do
         maybeTimerEvent <- getTimerEvent ev
         case maybeTimerEvent of
-          Just _ -> do
+          Just (TimerEvent ts) -> do
              t <- show <$> ticks
              tid <- show <$> myThreadId
-             putStrLn $ "Got timer event from queue at " ++ t ++ " ticks. Threadid: " ++ tid
+             putStrLn $ "Got timer event from queue at " ++ t ++ " ticks."
+             putStrLn $ "Timestamp: " ++ show ts
+             putStrLn $ "Threadid: " ++ tid
           Nothing -> return ()
         waitEvent >>= go
       _ -> waitEvent >>= go
